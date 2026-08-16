@@ -21,6 +21,11 @@ def _timestamp(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{seconds_value:02d},{millis:03d}"
 
 
+def from_transcription(result) -> list[SubtitleSegment]:
+    """قطعات خروجی Whisper را به قالب زیرنویس تبدیل می‌کند."""
+    return [SubtitleSegment(segment.start, segment.end, segment.text) for segment in result.segments]
+
+
 def write_srt(segments: list[SubtitleSegment], target: Path) -> Path:
     lines: list[str] = []
     for index, segment in enumerate(segments, 1):
