@@ -1,0 +1,21 @@
+name: آزمون و کنترل کیفیت
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: آزمون پروژه
+    runs-on: ubuntu-latest
+    steps:
+      - name: دریافت کد
+        uses: actions/checkout@v4
+      - name: نصب پایتون
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: نصب پروژه
+        run: python -m pip install -e ".[dev]"
+      - name: اجرای آزمون‌ها
+        run: pytest
