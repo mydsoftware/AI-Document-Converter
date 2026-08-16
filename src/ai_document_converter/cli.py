@@ -6,18 +6,17 @@ import argparse
 from pathlib import Path
 
 from .core.conversion_router import ConversionRouter
+from .core.executor import ConversionExecutor
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="adc", description="مبدل هوشمند همه‌کاره با OCR و هوش مصنوعی محلی")
     sub = parser.add_subparsers(dest="command", required=True)
-
     convert = sub.add_parser("convert", help="تبدیل فایل")
     convert.add_argument("input", type=Path, help="مسیر فایل ورودی")
-    convert.add_argument("--to", required=True, dest="target_format", help="فرمت خروجی؛ مانند docx، txt یا srt")
+    convert.add_argument("--to", required=True, dest="target_format", help="فرمت خروجی")
     convert.add_argument("--output", type=Path, help="مسیر فایل خروجی")
     convert.add_argument("--language", default="fa", help="زبان پردازش")
-
     info = sub.add_parser("system", help="نمایش سخت‌افزار و پیشنهاد AI")
     info.add_argument("--ai", action="store_true", help="نمایش وضعیت AI")
     return parser
@@ -49,16 +48,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"خطا: فایل پیدا نشد: {args.input}")
             return 2
         try:
-            kind, target_format = ConversionRouter().route(args.input, args.target_format.lower().lstrip('.'))
+            target_format = args.target_format.lower().lstrip('.')
+            ConversionRouter().route(args.input, target_format)
             target = args.output or args.input.with_suffix('.' + target_format)
-            print(f"نوع ورودی: {kind}")
-            print(f"فرمت خروجی: {target_format}")
-            print(f"مسیر خروجی: {target}")
-            print("مسیریابی با موفقیت انجام شد.")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            result = ConversionExecutor().execute(args.input, target, target_format, language=args.language)
+            print(f"تبدیل با موفقیت انجام شد: {result}")
             return 0
         except Exception as exc:
-            print(f"خطا: {exc}")
-            return 2
+            print(f"خطا در تبدیل: {exc}")
+            return 1
     return 1
 
 
