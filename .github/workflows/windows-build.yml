@@ -1,0 +1,35 @@
+name: ساخت و تست ویندوز
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: دریافت پروژه
+        uses: actions/checkout@v4
+
+      - name: نصب Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: نصب پروژه
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          pip install -e .
+
+      - name: بررسی CLI
+        shell: pwsh
+        run: |
+          python -m ai_document_converter.cli system --ai
+          python -m ai_document_converter.cli --help
+
+      - name: اجرای تست‌ها
+        shell: pwsh
+        run: pytest -q
