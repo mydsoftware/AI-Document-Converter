@@ -25,4 +25,5 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["ai_document_converter*"]
