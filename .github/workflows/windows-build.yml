@@ -23,6 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           if (Test-Path requirements.txt) { pip install -r requirements.txt }
           pip install -e .
+          pip install pyinstaller
 
       - name: بررسی CLI
         shell: pwsh
@@ -30,6 +31,20 @@ jobs:
           python -m ai_document_converter.cli system --ai
           python -m ai_document_converter.cli --help
 
+      - name: بررسی GUI
+        shell: pwsh
+        run: python -c "import tkinter; from ai_document_converter.gui.app import ConverterApp; print('GUI OK')"
+
       - name: اجرای تست‌ها
         shell: pwsh
         run: pytest -q
+
+      - name: ساخت نسخه GUI
+        shell: pwsh
+        run: python -m PyInstaller --noconfirm --clean --name AI-Document-Converter-GUI --windowed src/ai_document_converter/gui/app.py
+
+      - name: ذخیره Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Document-Converter-GUI-Windows
+          path: dist/AI-Document-Converter-GUI
