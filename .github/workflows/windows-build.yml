@@ -63,3 +63,12 @@ jobs:
         with:
           name: AI-Document-Converter-Setup-Windows
           path: installer/output/AI-Document-Converter-Setup.exe
+      - name: ثبت نتیجه ساخت
+        shell: pwsh
+        run: |
+          "Build pipeline completed: EXE + Installer" | Out-File -FilePath build-result.txt -Encoding utf8
+      - name: ذخیره گزارش ساخت
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Document-Converter-Build-Report
+          path: build-result.txt
