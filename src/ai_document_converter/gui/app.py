@@ -1,7 +1,8 @@
-"""رابط گرافیکی فارسی و سبک برای مبدل."""
+"""رابط گرافیکی فارسی برای مبدل همه‌کاره."""
 
 from __future__ import annotations
 
+import queue
 import threading
 from pathlib import Path
 import tkinter as tk
@@ -12,77 +13,111 @@ from ai_document_converter.core.executor import ConversionExecutor
 
 
 class ConverterApp(tk.Tk):
-    """رابط دسکتاپ فارسی با انتخاب فایل و نمایش وضعیت."""
+    """رابط دسکتاپ فارسی با صف چندفایلی و پردازش پس‌زمینه."""
 
     def __init__(self) -> None:
         super().__init__()
         self.title("مبدل هوشمند همه‌کاره")
-        self.geometry("720x460")
-        self.minsize(620, 400)
-        self.source: Path | None = None
+        self.geometry("860x600")
+        self.minsize(720, 500)
+        self.files: list[Path] = []
+        self.jobs: queue.Queue[tuple[Path, str]] = queue.Queue()
+        self.running = False
         self._build()
 
     def _build(self) -> None:
         frame = ttk.Frame(self, padding=24)
         frame.pack(fill="both", expand=True)
-        ttk.Label(frame, text="مبدل هوشمند همه‌کاره", font=("Segoe UI", 20, "bold")).pack(pady=(0, 18))
-        ttk.Label(frame, text="PDF، تصویر، صوت و ویدیو را به خروجی مناسب تبدیل کنید.").pack(pady=(0, 20))
+        ttk.Label(frame, text="مبدل هوشمند همه‌کاره", font=("Segoe UI", 20, "bold")).pack(pady=(0, 8))
+        ttk.Label(frame, text="چند فایل را انتخاب کنید و هرکدام را به فرمت مناسب تبدیل کنید.").pack(pady=(0, 15))
 
-        self.file_label = ttk.Label(frame, text="هنوز فایلی انتخاب نشده است")
-        self.file_label.pack(pady=8)
-        ttk.Button(frame, text="انتخاب فایل", command=self.select_file).pack(pady=8)
+        buttons = ttk.Frame(frame)
+        buttons.pack(fill="x", pady=8)
+        ttk.Button(buttons, text="افزودن فایل", command=self.add_files).pack(side="left", padx=5)
+        ttk.Button(buttons, text="پاک کردن فهرست", command=self.clear_files).pack(side="left", padx=5)
+
+        self.file_list = tk.Listbox(frame, height=12)
+        self.file_list.pack(fill="both", expand=True, pady=10)
 
         options = ttk.Frame(frame)
-        options.pack(pady=18)
-        ttk.Label(options, text="فرمت خروجی:").grid(row=0, column=0, padx=8)
+        options.pack(fill="x", pady=8)
+        ttk.Label(options, text="فرمت خروجی:").pack(side="left", padx=5)
         self.format_var = tk.StringVar(value="docx")
-        ttk.Combobox(options, textvariable=self.format_var, values=("docx", "txt", "srt", "md"), state="readonly", width=12).grid(row=0, column=1)
+        ttk.Combobox(options, textvariable=self.format_var, values=("docx", "txt", "srt", "md"), state="readonly", width=12).pack(side="left")
 
-        self.progress = ttk.Progressbar(frame, mode="indeterminate")
-        self.progress.pack(fill="x", pady=15)
+        self.progress = ttk.Progressbar(frame, mode="determinate", maximum=100)
+        self.progress.pack(fill="x", pady=12)
         self.status = ttk.Label(frame, text="آماده")
-        self.status.pack(pady=8)
-        ttk.Button(frame, text="شروع تبدیل", command=self.start).pack(pady=10)
+        self.status.pack(pady=5)
+        ttk.Button(frame, text="شروع تبدیل همه فایل‌ها", command=self.start).pack(pady=8)
 
-    def select_file(self) -> None:
-        selected = filedialog.askopenfilename(title="انتخاب فایل")
+    def add_files(self) -> None:
+        selected = filedialog.askopenfilenames(title="انتخاب فایل‌ها")
+        for item in selected:
+            path = Path(item)
+            if path not in self.files:
+                self.files.append(path)
+                self.file_list.insert(tk.END, str(path))
         if selected:
-            self.source = Path(selected)
-            self.file_label.config(text=str(self.source))
-            self.status.config(text="فایل انتخاب شد")
+            self.status.config(text=f"{len(self.files)} فایل در صف قرار گرفت")
+
+    def clear_files(self) -> None:
+        if self.running:
+            return
+        self.files.clear()
+        self.file_list.delete(0, tk.END)
+        self.progress["value"] = 0
+        self.status.config(text="فهرست پاک شد")
 
     def start(self) -> None:
-        if not self.source:
-            messagebox.showwarning("انتخاب فایل", "ابتدا یک فایل انتخاب کنید.")
+        if self.running:
+            return
+        if not self.files:
+            messagebox.showwarning("فهرست فایل", "ابتدا حداقل یک فایل انتخاب کنید.")
             return
         target_format = self.format_var.get()
-        try:
-            ConversionRouter().route(self.source, target_format)
-        except Exception as exc:
-            messagebox.showerror("خطا", str(exc))
+        valid: list[Path] = []
+        for source in self.files:
+            try:
+                ConversionRouter().route(source, target_format)
+                valid.append(source)
+            except Exception as exc:
+                messagebox.showwarning("فایل رد شد", f"{source.name}: {exc}")
+        if not valid:
             return
-        target = self.source.with_suffix("." + target_format)
-        self.progress.start(10)
-        self.status.config(text="در حال پردازش...")
-        threading.Thread(target=self._run, args=(target, target_format), daemon=True).start()
+        self.jobs = queue.Queue()
+        for source in valid:
+            self.jobs.put((source, target_format))
+        self.running = True
+        self.progress["value"] = 0
+        self.progress["maximum"] = len(valid)
+        threading.Thread(target=self._worker, daemon=True).start()
 
-    def _run(self, target: Path, target_format: str) -> None:
-        try:
-            result = ConversionExecutor().execute(self.source, target, target_format)
-        except Exception as exc:
-            self.after(0, self._failed, str(exc))
-            return
-        self.after(0, self._done, result)
+    def _worker(self) -> None:
+        total = self.jobs.qsize()
+        done = 0
+        while not self.jobs.empty():
+            source, target_format = self.jobs.get()
+            target = source.with_suffix("." + target_format)
+            try:
+                ConversionExecutor().execute(source, target, target_format)
+                done += 1
+                self.after(0, self._progress, done, total, source.name)
+            except Exception as exc:
+                self.after(0, self._failed_item, source.name, str(exc))
+        self.after(0, self._finished, done, total)
 
-    def _done(self, result: Path) -> None:
-        self.progress.stop()
-        self.status.config(text=f"تکمیل شد: {result}")
-        messagebox.showinfo("تبدیل کامل شد", f"فایل خروجی ساخته شد:\n{result}")
+    def _progress(self, done: int, total: int, name: str) -> None:
+        self.progress["value"] = done
+        self.status.config(text=f"{done} از {total}: {name}")
 
-    def _failed(self, error: str) -> None:
-        self.progress.stop()
-        self.status.config(text="تبدیل ناموفق بود")
-        messagebox.showerror("خطا در تبدیل", error)
+    def _failed_item(self, name: str, error: str) -> None:
+        self.status.config(text=f"خطا در {name}: {error}")
+
+    def _finished(self, done: int, total: int) -> None:
+        self.running = False
+        self.status.config(text=f"پردازش پایان یافت: {done} از {total} موفق")
+        messagebox.showinfo("پایان تبدیل", f"پردازش تمام شد.\nموفق: {done}\nکل: {total}")
 
 
 def main() -> None:
