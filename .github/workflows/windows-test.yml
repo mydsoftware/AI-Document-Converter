@@ -24,7 +24,7 @@ jobs:
         run: python -m pip install -e ".[full,dev]"
       - name: آزمون‌ها
         shell: pwsh
-        run: pytest
+        run: python -m pytest -q
       - name: آزمون CLI
         shell: pwsh
         run: python -m ai_document_converter.cli system --ai
