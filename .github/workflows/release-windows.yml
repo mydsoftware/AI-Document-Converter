@@ -1,0 +1,47 @@
+name: انتشار نسخه ویندوز
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "برچسب نسخه، مانند v0.1.0"
+        required: true
+        type: string
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: دریافت پروژه
+        uses: actions/checkout@v4
+
+      - name: نصب Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: ساخت برنامه
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) { pip install -r requirements.txt }
+          pip install -e .
+          pip install pyinstaller
+          python -m PyInstaller --noconfirm --clean --name AI-Document-Converter --console src/ai_document_converter/cli.py
+
+      - name: بسته‌بندی
+        shell: pwsh
+        run: Compress-Archive -Path dist/AI-Document-Converter/* -DestinationPath AI-Document-Converter-Windows.zip
+
+      - name: انتشار GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          generate_release_notes: true
+          files: AI-Document-Converter-Windows.zip
