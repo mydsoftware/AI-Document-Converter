@@ -27,4 +27,4 @@ jobs:
         run: python -m pytest -q
       - name: آزمون CLI
         shell: pwsh
-        run: python -m ai_document_converter.cli system --ai
+        run: python -m ai_document_converter.cli اطلاعات
