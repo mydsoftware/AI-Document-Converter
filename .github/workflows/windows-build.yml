@@ -15,12 +15,10 @@ jobs:
     steps:
       - name: دریافت پروژه
         uses: actions/checkout@v4
-
       - name: نصب Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: نصب پروژه
         shell: pwsh
         run: |
@@ -28,27 +26,40 @@ jobs:
           if (Test-Path requirements.txt) { python -m pip install -r requirements.txt }
           python -m pip install -e .
           python -m pip install pyinstaller
-
       - name: بررسی CLI
         shell: pwsh
         run: |
           python -m ai_document_converter.cli system --ai
           python -m ai_document_converter.cli --help
-
       - name: بررسی GUI
         shell: pwsh
         run: python -c "import tkinter; from ai_document_converter.gui.app import ConverterApp; print('GUI OK')"
-
       - name: اجرای تست‌ها
         shell: pwsh
         run: python -m pytest -q
-
       - name: ساخت نسخه GUI
         shell: pwsh
         run: python -m PyInstaller --noconfirm --clean --name AI-Document-Converter-GUI --windowed src/ai_document_converter/gui/app.py
-
-      - name: ذخیره Artifact
+      - name: بررسی فایل اجرایی
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/AI-Document-Converter-GUI/AI-Document-Converter-GUI.exe")) { throw "فایل اجرایی GUI ساخته نشد" }
+      - name: نصب Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+      - name: ساخت نصب‌کننده
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path installer/output | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "installer/AI-Document-Converter.iss"
+          if (!(Test-Path "installer/output/AI-Document-Converter-Setup.exe")) { throw "Setup.exe ساخته نشد" }
+      - name: ذخیره EXE
         uses: actions/upload-artifact@v4
         with:
           name: AI-Document-Converter-GUI-Windows
           path: dist/AI-Document-Converter-GUI
+      - name: ذخیره نصب‌کننده
+        uses: actions/upload-artifact@v4
+        with:
+          name: AI-Document-Converter-Setup-Windows
+          path: installer/output/AI-Document-Converter-Setup.exe
